@@ -1,0 +1,8 @@
+[package]
+name = "pmc-wiz"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+macroquad = "0.4.16"
+tiny-pmc = {git = "https://github.com/johannesalehmann/tiny-pmc"}
