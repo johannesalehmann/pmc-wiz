@@ -1,11 +1,32 @@
-fn main() {
+use macroquad::prelude::*;
+use std::collections::HashMap;
+use tiny_pmc::ProcessingOptions;
+
+#[macroquad::main("MyGame")]
+async fn main() {
     let Ok((files, consts)) = parse_args() else {
         return;
     };
     let inputs =
         tiny_pmc::parsing::Inputs::from_cli_args(&files).expect("failed to parse input files");
-    let consts = tiny_pmc::parsing::parse_const_assignments(&consts[0])
-        .expect("failed to parse constant assignments");
+    let consts = if let Some(consts) = consts.first() {
+        tiny_pmc::parsing::parse_const_assignments(&consts)
+            .expect("failed to parse constant assignments")
+    } else {
+        HashMap::new()
+    };
+    let (model, queries) = tiny_pmc::build_model(inputs, consts, &ProcessingOptions::default())
+        .expect("failed to build model");
+    loop {
+        clear_background(RED);
+
+        draw_line(40.0, 40.0, 100.0, 200.0, 15.0, BLUE);
+        draw_rectangle(screen_width() / 2.0 - 60.0, 100.0, 120.0, 60.0, GREEN);
+
+        draw_text("Hello, Macroquad!", 20.0, 20.0, 30.0, DARKGRAY);
+
+        next_frame().await
+    }
 }
 
 fn parse_args() -> Result<(Vec<String>, Vec<String>), ()> {
@@ -53,7 +74,7 @@ fn print_help() {
      /l\/j\  (]    .  O         | Call with:
     /. ~~ ,\/I          .       |     pmc-wiz model_file.prism props_file.props -c "K=5,n=12"
     \\L__j^\/I       o          |
-     \/--v}  I     o   .        | Model and property files can be in any order. UMB files also supported.
+     \/--v}  I     o   .        | Model and property files can be in any order.
      |    |  I   _________
      |    |  I c(`       ')o
      |    l  I   \.     ,/

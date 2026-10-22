@@ -1,0 +1,22 @@
+mdp
+
+label "goal" = x=w & y=h;
+
+const w = 5;
+const h = 5;
+
+module main
+    x: [0..w] init 0;
+    y: [0..h] init 0;
+
+    [left] (x < w) -> (x'=x+1);
+    [right] (x > 0) -> (x'=x-1);
+    [up] (y > 0) -> (y'=y-1);
+    [down] (y < h) -> (y'=y+1);
+
+    [try_my_luck] (x < w | y < h) -> 0.45: (x'=0) + 0.45: (y'=0) + 0.1: (x'=w) & (y'=h);
+endmodule
+
+rewards
+    [down] true :  1;
+endrewards
