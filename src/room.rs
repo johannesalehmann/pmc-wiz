@@ -112,7 +112,7 @@ impl Block {
             }
             Block::Sign { left, segment } => {
                 let start = if *left { 5 } else { 3 };
-                Self::draw_internal(x, y - 1, z, start + *segment as usize, 2, camera, texture);
+                Self::draw_internal(x, y, z, start + *segment as usize, 2, camera, texture);
             }
             Block::Tube { segment } => {
                 Self::draw_internal(x, y - 1, z, 0, 2 + *segment as usize, camera, texture);
@@ -125,16 +125,18 @@ impl Block {
             Block::Air | Block::SolidAir => false,
             Block::Floor | Block::Pillar { .. } => AABB::int_cube(x, y, z).intersects(other),
             Block::Bridge { segment, .. } => {
-                const SAG: f32 = 0.4;
+                const SAG: f32 = 0.2;
                 if *segment == 0 || *segment == 2 {
-                    for i in 0..10 {
+                    let segs = 32;
+                    let seg_size = 1.0 / segs as f32;
+                    for i in 0..32 {
                         let height = if *segment == 0 {
-                            (i as f32 * 0.1) * SAG
+                            (i as f32 * seg_size) * SAG
                         } else {
-                            ((9 - i) as f32 * 0.1) * SAG
+                            ((segs - i - 1) as f32 * seg_size) * SAG
                         };
                         let aabb = AABB::from_pos_and_size(
-                            Vec3::new(x as f32 + i as f32 * 0.1, y as f32 + height, z as f32),
+                            Vec3::new(x as f32 + i as f32 * seg_size, y as f32 + height, z as f32),
                             Vec3::new(0.1, 1.0 - height, 1.0),
                         );
                         if aabb.intersects(other) {
@@ -150,12 +152,29 @@ impl Block {
                     aabb.intersects(other)
                 }
             }
-            Block::StairLeft => false,
-            Block::StairRight => false,
+            Block::StairLeft | Block::StairRight => {
+                let segs = 32;
+                let seg_size = 1.0 / segs as f32;
+                for i in 0..32 {
+                    let height = if matches!(self, Block::StairLeft) {
+                        i as f32 * seg_size
+                    } else {
+                        (segs - i - 1) as f32 * seg_size
+                    };
+                    let aabb = AABB::from_pos_and_size(
+                        Vec3::new(x as f32 + i as f32 * seg_size, y as f32 + height, z as f32),
+                        Vec3::new(0.1, 1.0 - height, 1.0),
+                    );
+                    if aabb.intersects(other) {
+                        return true;
+                    }
+                }
+                false
+            }
             Block::SlideLeft => false,
             Block::SlideRight => false,
             Block::Sign { .. } => AABB::from_pos_and_size(
-                Vec3::new(x as f32, y as f32, z as f32 + 0.8),
+                Vec3::new(x as f32, y as f32, z as f32),
                 Vec3::new(1.0, 1.0, 0.2),
             )
             .intersects(other),
@@ -241,11 +260,11 @@ pub struct Room {
 impl Room {
     pub fn new(width: usize, height: usize, depth: usize) -> Self {
         let mut blocks = Vec::new();
-        for j in 0..depth {
+        for _j in 0..depth {
             let mut layer = Vec::new();
-            for k in 0..height {
+            for _k in 0..height {
                 let mut row = Vec::new();
-                for i in 0..width {
+                for _i in 0..width {
                     row.push(Block::SolidAir);
                 }
                 layer.push(row);
@@ -257,7 +276,7 @@ impl Room {
                 position: Default::default(),
                 velocity: Default::default(),
                 width: 0.6,
-                height: 0.6 + 2.0,
+                height: 0.6 + 1.0,
             },
             blocks,
             entities_per_layer: vec![Vec::new(); depth],
@@ -313,7 +332,6 @@ impl Room {
         for layer in &mut self.entities_per_layer {
             layer.clear();
         }
-        println!("{}", self.player.position);
         self.insert_entity(
             self.player.position + Vec3::new(0.0, self.player.height * -0.5, 0.0),
             Vec2::new(self.player.width, self.player.height),
@@ -369,18 +387,66 @@ impl Room {
         if direction.length_squared() > 0.0 {
             direction = direction.normalize();
         }
-        let speed = 5.0;
-        self.player.position.x += direction.x * speed * elapsed;
-        if self.intersects(&self.player_bb()) {
-            self.player.position.x -= direction.x * speed * elapsed;
+        let speed = 3.0;
+        let acceleration = 30.0;
+        direction *= speed;
+        if self.player.velocity.x < direction.x {
+            self.player.velocity.x =
+                (self.player.velocity.x + acceleration * elapsed).min(direction.x);
         }
-        self.player.position.z += direction.y * speed * elapsed;
-        if self.intersects(&self.player_bb()) {
-            self.player.position.z -= direction.y * speed * elapsed;
+        if self.player.velocity.x > direction.x {
+            self.player.velocity.x =
+                (self.player.velocity.x - acceleration * elapsed).max(direction.x);
         }
-        self.player.position.y += elapsed * 2.0;
+        if self.player.velocity.z < direction.y {
+            self.player.velocity.z =
+                (self.player.velocity.z + acceleration * elapsed).min(direction.y);
+        }
+        if self.player.velocity.z > direction.y {
+            self.player.velocity.z =
+                (self.player.velocity.z - acceleration * elapsed).max(direction.y);
+        }
+        self.player.velocity.y += 50.0 * elapsed;
+
+        let climb_budget = self.player.velocity.length() * 1.7 * elapsed;
+        let (moved, climb_budget) = self.move_player(
+            self.player.position + Vec3::new(self.player.velocity.x * elapsed, 0.0, 0.0),
+            climb_budget,
+        );
+        if !moved {
+            self.player.velocity.x = 0.0;
+        }
+
+        let (moved, _climb_budget) = self.move_player(
+            self.player.position + Vec3::new(0.0, 0.0, self.player.velocity.z * elapsed),
+            climb_budget,
+        );
+        if !moved {
+            self.player.velocity.z = 0.0;
+        }
+        self.player.velocity.y += 9.0 * elapsed;
+        self.player.position.y += self.player.velocity.y * elapsed;
         if self.intersects(&self.player_bb()) {
-            self.player.position.y -= elapsed * 2.0;
+            self.player.position.y -= self.player.velocity.y * elapsed;
+            self.player.velocity.y = 0.0;
+        }
+    }
+
+    fn move_player(&mut self, to: Vec3, climb_budget: f32) -> (bool, f32) {
+        // true if moved successfully, f32 stores remaining climb budget
+        let old_pos = self.player.position;
+        let steps = 0.01;
+        let mut counter = 0;
+        loop {
+            self.player.position = to - Vec3::new(0.0, steps * counter as f32, 0.0);
+            if !self.intersects(&self.player_bb()) {
+                return (true, climb_budget - steps * counter as f32);
+            }
+            if steps * counter as f32 >= climb_budget {
+                self.player.position = old_pos;
+                return (false, climb_budget);
+            }
+            counter += 1;
         }
     }
 
