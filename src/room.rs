@@ -123,8 +123,32 @@ impl Block {
     pub fn intersects(&self, x: usize, y: usize, z: usize, other: &AABB) -> bool {
         match self {
             Block::Air | Block::SolidAir => false,
-            Block::Floor | Block::Pillar { .. } | Block::Bridge { .. } => {
-                AABB::int_cube(x, y, z).intersects(other)
+            Block::Floor | Block::Pillar { .. } => AABB::int_cube(x, y, z).intersects(other),
+            Block::Bridge { segment, .. } => {
+                const SAG: f32 = 0.4;
+                if *segment == 0 || *segment == 2 {
+                    for i in 0..10 {
+                        let height = if *segment == 0 {
+                            (i as f32 * 0.1) * SAG
+                        } else {
+                            ((9 - i) as f32 * 0.1) * SAG
+                        };
+                        let aabb = AABB::from_pos_and_size(
+                            Vec3::new(x as f32 + i as f32 * 0.1, y as f32 + height, z as f32),
+                            Vec3::new(0.1, 1.0 - height, 1.0),
+                        );
+                        if aabb.intersects(other) {
+                            return true;
+                        }
+                    }
+                    false
+                } else {
+                    let aabb = AABB::from_pos_and_size(
+                        Vec3::new(x as f32, y as f32 + SAG, z as f32),
+                        Vec3::new(1.0, 1.0 - SAG, 1.0),
+                    );
+                    aabb.intersects(other)
+                }
             }
             Block::StairLeft => false,
             Block::StairRight => false,
