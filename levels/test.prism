@@ -9,10 +9,10 @@ module main
     x: [0..w] init 0;
     y: [0..h] init 0;
 
-    [left] (x < w) -> (x'=x+1);
-    [right] (x > 0) -> (x'=x-1);
-    [up] (y > 0) -> (y'=y-1);
-    [down] (y < h) -> (y'=y+1);
+    [left] (x < w) ->  0.1: (y'=max(y-1, 0)) + 0.1: (y'=min(y+ 1, h)) + 0.8: (x'=x+1);
+    [right] (x > 0) -> 0.1: (y'=max(y-1, 0)) + 0.1: (y'=min(y+ 1, h)) + 0.8: (x'=x-1);
+    [up] (y > 0) ->    0.1: (x'=max(x-1, 0)) + 0.1: (x'=min(x+ 1, w)) + 0.8: (y'=y-1);
+    [down] (y < h) ->  0.1: (x'=max(x-1, 0)) + 0.1: (x'=min(x+ 1, w)) + 0.8: (y'=y+1);
 
     [gamble] (x < w | y < h) -> 0.55: (x'=0) + 0.4: (y'=0) + 0.05: (x'=w) & (y'=h);
 endmodule

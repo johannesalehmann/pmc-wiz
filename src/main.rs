@@ -60,7 +60,7 @@ async fn main() {
     loop {
         clear_background(BLACK);
         if let Some(to) = room.teleport_to {
-            black_fade += get_frame_time() * 1.0;
+            black_fade += get_frame_time() * 1.3;
             if black_fade >= 1.0 {
                 black_fade = 1.0;
                 room = RoomGenerator::generate(&model, StateIndex::from_raw(to));
@@ -74,13 +74,18 @@ async fn main() {
         room.update();
         camera.update(screen_size(), room.player_pos());
         room.draw(&texture, &camera);
-        if black_fade > 0.0 {
+        let actual_fade = if room.teleport_to.is_some() {
+            (black_fade * 3.0 - 2.0).max(0.0)
+        } else {
+            (black_fade * 2.0).min(1.0)
+        };
+        if actual_fade > 0.0 {
             draw_rectangle(
                 0.0,
                 0.0,
                 screen_width(),
                 screen_height(),
-                Color::new(0.0, 0.0, 0.0, black_fade),
+                Color::new(0.0, 0.0, 0.0, actual_fade),
             );
         }
 
