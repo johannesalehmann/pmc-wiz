@@ -112,8 +112,7 @@ fn parse_args() -> Result<(Vec<String>, Vec<String>), ()> {
         } else if arg.starts_with("-") {
             println!("unexpected argument `{arg}`");
             return Err(());
-        }
-        if next_is_const {
+        } else if next_is_const {
             if consts.len() > 0 {
                 println!(
                     "constants specified twice (combine all constants into a single argument instead)"
@@ -121,6 +120,7 @@ fn parse_args() -> Result<(Vec<String>, Vec<String>), ()> {
                 return Err(());
             }
             consts.push(arg);
+            next_is_const = false;
         } else {
             files.push(arg);
         }
