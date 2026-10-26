@@ -109,8 +109,7 @@ fn parse_args() -> Result<(Vec<String>, Vec<String>), ()> {
         }
         if arg == "-c" {
             next_is_const = true;
-        }
-        if arg.starts_with("-") {
+        } else if arg.starts_with("-") {
             println!("unexpected argument `{arg}`");
             return Err(());
         }
