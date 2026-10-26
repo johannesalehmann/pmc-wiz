@@ -195,6 +195,7 @@ impl Player {
     }
 }
 
+#[derive(Debug)]
 pub enum Block {
     #[allow(unused)]
     Air,
@@ -328,6 +329,52 @@ impl Block {
                 let size = camera.project_size(Vec2::new(0.0, 0.57));
                 draw_text(text, pos.x, pos.y, size.y, Color::new(0.8, 0.8, 0.8, 1.0));
             }
+        }
+    }
+    pub fn draw_front(&self, x: usize, y: usize, z: usize, camera: &Camera, texture: &Texture2D) {
+        let y = y as isize;
+        match self {
+            Block::Tube { segment, text } => {
+                if *segment == 0 {
+                    let (tx, ty) = (0, 2);
+                    let position = camera.project(Vec3::new(x as f32, y as f32 - 0.5, z as f32));
+                    let size = camera.project_size(Vec2::new(1.0, 0.5));
+                    let rect = Rect::new(16.0 * (tx as f32), 16.0 * (ty as f32) + 8.0, 16.0, 8.0);
+                    draw_texture_ex(
+                        texture,
+                        position.x,
+                        position.y,
+                        Color::new(1.0, 1.0, 1.0, 1.0),
+                        DrawTextureParams {
+                            dest_size: Some(size),
+                            source: Some(rect),
+                            rotation: 0.0,
+                            flip_x: false,
+                            flip_y: false,
+                            pivot: None,
+                        },
+                    );
+
+                    let pos = camera.project(Vec3::new(x as f32 + 0.4, y as f32, z as f32));
+                    let size = camera.project_size(Vec2::new(0.0, 0.57));
+                    draw_text_ex(
+                        text,
+                        pos.x,
+                        pos.y,
+                        TextParams {
+                            font: None,
+                            font_size: size.y as u16,
+                            font_scale: 1.0,
+                            font_scale_aspect: 1.0,
+                            rotation: std::f32::consts::PI * 0.5,
+                            color: BLACK,
+                        },
+                    );
+                } else {
+                    Self::draw_internal(x, y - 1, z, 0, 2 + *segment as usize, camera, texture);
+                }
+            }
+            _ => (),
         }
     }
 
@@ -490,6 +537,22 @@ pub struct Particle {
     kind: EntityVariants,
 }
 
+pub enum IntersectionResult {
+    Intersects,
+    NoIntersection,
+    Slide,
+}
+
+impl IntersectionResult {
+    pub fn is_slide(&self) -> bool {
+        matches!(self, IntersectionResult::Slide)
+    }
+
+    pub fn is_solid(&self) -> bool {
+        !matches!(self, &IntersectionResult::NoIntersection)
+    }
+}
+
 pub struct Room {
     player: Player,
     blocks: Vec<Vec<Vec<Block>>>,
@@ -555,7 +618,7 @@ impl Room {
         }
     }
 
-    fn intersects(&self, bb: &AABB) -> bool {
+    fn intersects(&self, bb: &AABB) -> IntersectionResult {
         let from = (bb.min - Vec3::new(1.0, 1.0, 1.0).floor())
             .max(Vec3::new(0.0, 0.0, 0.0))
             .as_uvec3();
@@ -566,6 +629,7 @@ impl Room {
                 self.depth as f32,
             ))
             .as_uvec3();
+        let mut slide = false;
         for x in from.x..to.x {
             for y in from.y..to.y {
                 for z in from.z..to.z {
@@ -573,12 +637,26 @@ impl Room {
                         .get_block(x as usize, y as usize, z as usize)
                         .intersects(x as usize, y as usize, z as usize, bb)
                     {
-                        return true;
+                        if matches!(
+                            self.get_block(x as usize, y as usize, z as usize),
+                            Block::SlideLeft
+                        ) || matches!(
+                            self.get_block(x as usize, y as usize, z as usize),
+                            Block::SlideRight
+                        ) {
+                            slide = true;
+                        } else {
+                            return IntersectionResult::Intersects;
+                        }
                     }
                 }
             }
         }
-        false
+        if slide {
+            IntersectionResult::Slide
+        } else {
+            IntersectionResult::NoIntersection
+        }
     }
 
     fn insert_entity(&mut self, position: Vec3, size: Vec2, texture: EntityVariants) {
@@ -625,6 +703,10 @@ impl Room {
                 }
                 for x in 0..self.width {
                     self.get_block(x, y, z).draw(x, y, z, camera, texture);
+                    if z < self.depth - 1 {
+                        self.get_block(x, y, z + 1)
+                            .draw_front(x, y, z + 1, camera, texture);
+                    }
                 }
             }
         }
@@ -700,9 +782,46 @@ impl Room {
         if !moved {
             self.player.velocity.z = 0.0;
         }
+
         self.player.velocity.y += 9.0 * elapsed;
         self.player.position.y += self.player.velocity.y * elapsed;
-        let touched_ground = if self.intersects(&self.player_bb()) {
+        let intersection = self.intersects(&self.player_bb());
+        let touched_ground = if intersection.is_slide() {
+            let step = 0.002;
+            let max_slide = self.player.velocity.y * elapsed * 2.0;
+            let mut done = false;
+            let mut slid = false;
+            let mut moved_left = false;
+            for i in 0..500 {
+                for j in [-1, 1] {
+                    let offset = step * i as f32 * j as f32;
+                    moved_left = j == -1;
+                    if offset.abs() > max_slide || done {
+                        done = true;
+                        continue;
+                    }
+                    self.player.position.x += offset;
+                    if self.intersects(&self.player_bb()).is_solid() {
+                        self.player.position.x -= offset;
+                    } else {
+                        slid = true;
+                        done = true;
+                    }
+                }
+            }
+            if slid {
+                //self.player.velocity.y += 15.0 * self.player.velocity.y * elapsed;
+                if moved_left {
+                    self.player.velocity.x = 0.0; // self.player.velocity.y;
+                } else {
+                    self.player.velocity.x = 0.0; // -self.player.velocity.y;
+                }
+            } else {
+                self.player.position.y -= self.player.velocity.y * elapsed;
+                self.player.velocity.y = 0.0;
+            }
+            true
+        } else if intersection.is_solid() {
             self.player.position.y -= self.player.velocity.y * elapsed;
             self.player.velocity.y = 0.0;
             true
@@ -840,13 +959,13 @@ impl Room {
             })
         }
         if touched_ground {
-            if self.rng.gen_range(0.0, 1.0) < elapsed * self.player.velocity.length() {
+            if self.rng.gen_range(0.0, 0.5) < elapsed * self.player.velocity.length() {
                 self.particles.push(Particle {
                     position: self.player.position,
                     velocity: Vec3::new(
-                        self.rng.gen_range(-0.2, 0.2),
-                        -self.rng.gen_range(0.3, 0.6),
-                        self.rng.gen_range(-0.2, 0.2),
+                        self.rng.gen_range(-0.3, 0.3),
+                        -self.rng.gen_range(0.6, 1.5),
+                        self.rng.gen_range(-0.3, 0.3),
                     ),
                     ttl: self.rng.gen_range(0.1, 0.7),
                     gravity_factor: 0.5,
@@ -865,7 +984,7 @@ impl Room {
         let mut counter = 0;
         loop {
             self.player.position = to - Vec3::new(0.0, steps * counter as f32, 0.0);
-            if !self.intersects(&self.player_bb()) {
+            if !self.intersects(&self.player_bb()).is_solid() {
                 return (true, climb_budget - steps * counter as f32);
             }
             if steps * counter as f32 >= climb_budget {
@@ -942,7 +1061,7 @@ impl Room {
                         height as f32 - 0.5,
                         z as f32 - 0.5,
                     ),
-                    Vec3::new(0.3, 1.5, 1.5),
+                    Vec3::new(0.15, 1.5, 1.5),
                 ),
                 tiles,
             })
@@ -1045,8 +1164,8 @@ impl RoomGenerator {
     ) -> Room {
         let (width, depth) = (150, 150);
         let rng = macroquad::rand::RandGenerator::new();
-        rng.srand(std::time::UNIX_EPOCH.elapsed().unwrap().as_secs());
-        // rng.srand(state.raw().as_usize() as u64);
+        // rng.srand(std::time::UNIX_EPOCH.elapsed().unwrap().as_secs());
+        rng.srand(state.raw().as_usize() as u64);
         let transition_rng = macroquad::rand::RandGenerator::new();
         transition_rng.srand(std::time::UNIX_EPOCH.elapsed().unwrap().as_secs());
 
@@ -1088,7 +1207,7 @@ impl RoomGenerator {
         let z = self.room.depth / 2 - depth / 2;
         self.room.carve_platform(height, x, z, x + width, z + depth);
         let p_x = x + width / 2;
-        let p_z = z + self.rng.gen_range(1, width - 1);
+        let p_z = z + self.rng.gen_range(1, width - 2);
         self.room.set_block(
             x + width / 2,
             height - 1,

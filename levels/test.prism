@@ -10,13 +10,11 @@ module main
     y: [0..h] init 0;
 
     [left] (x < w) -> (x'=x+1);
-    // [right] (x > 0) -> (x'=x-1);
-    // [up] (y > 0) -> (y'=y-1);
-    // [down] (y < h) -> (y'=y+1);
-    // 
-    // [try_my_luck] (x < w | y < h) -> 0.45: (x'=0) + 0.45: (y'=0) + 0.1: (x'=w) & (y'=h);
-    // 
-    // [slow_probs] (true) -> 0.05: (x'=0) + 0.1: (x'=1) + 0.2: (x'=1) + 0.65: (x'=1);
+    [right] (x > 0) -> (x'=x-1);
+    [up] (y > 0) -> (y'=y-1);
+    [down] (y < h) -> (y'=y+1);
+
+    [gamble] (x < w | y < h) -> 0.55: (x'=0) + 0.4: (y'=0) + 0.05: (x'=w) & (y'=h);
 endmodule
 
 rewards
