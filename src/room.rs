@@ -24,6 +24,22 @@ pub enum EntityVariants {
         direction: PlayerDirection,
         alt: bool,
     },
+    Plank {
+        variant: u8, // From 0 to 4
+        rotation: f32,
+    },
+    SmallBridgeBits {
+        variant: u8,
+    },
+    BigSorcery {
+        variant: u8,
+    },
+    SmallSorcery {
+        variant: u8,
+    },
+    Dust {
+        variant: u8,
+    },
 }
 
 impl EntityVariants {
@@ -49,6 +65,51 @@ impl EntityVariants {
                     0.0,
                 )
             }
+            EntityVariants::Plank { variant, rotation } => (
+                Rect {
+                    x: 7.0 * 16.0,
+                    y: 2.0 * 16.0 + *variant as f32 * 4.0,
+                    w: 16.0,
+                    h: 4.0,
+                },
+                *rotation,
+            ),
+            EntityVariants::SmallBridgeBits { variant } => (
+                Rect {
+                    x: 8.0 * 16.0 + (*variant % 2) as f32 * 8.0,
+                    y: 2.0 * 16.0 + (*variant / 2) as f32 * 4.0,
+                    w: 8.0,
+                    h: 4.0,
+                },
+                0.0,
+            ),
+            EntityVariants::BigSorcery { variant } => (
+                Rect {
+                    x: 9.0 * 16.0 + (*variant % 2) as f32 * 8.0,
+                    y: 2.0 * 16.0 + (*variant / 2) as f32 * 8.0,
+                    w: 8.0,
+                    h: 8.0,
+                },
+                0.0,
+            ),
+            EntityVariants::SmallSorcery { variant } => (
+                Rect {
+                    x: 10.0 * 16.0 + (*variant % 2) as f32 * 8.0,
+                    y: 2.0 * 16.0 + (*variant / 2) as f32 * 8.0,
+                    w: 8.0,
+                    h: 8.0,
+                },
+                0.0,
+            ),
+            EntityVariants::Dust { variant } => (
+                Rect {
+                    x: 11.0 * 16.0 + (*variant % 2) as f32 * 8.0,
+                    y: 2.0 * 16.0 + (*variant / 2) as f32 * 8.0,
+                    w: 8.0,
+                    h: 8.0,
+                },
+                0.0,
+            ),
         }
     }
 }
@@ -100,6 +161,15 @@ pub struct Player {
 impl Player {
     pub fn walk_cycle(&self) -> bool {
         self.distance % 0.8 < 0.4
+    }
+
+    pub fn staff_position(&self) -> Vec3 {
+        match self.last_direction {
+            PlayerDirection::Left => self.position + Vec3::new(-0.1, -0.8, 0.0),
+            PlayerDirection::Right => self.position + Vec3::new(0.35, -0.8, 0.0),
+            PlayerDirection::Up => self.position + Vec3::new(0.35, -0.8, 0.0),
+            PlayerDirection::Down => self.position + Vec3::new(-0.2, -0.8, 0.0),
+        }
     }
 
     pub fn update_direction(&mut self) -> PlayerDirection {
@@ -412,6 +482,14 @@ impl AABB {
     }
 }
 
+pub struct Particle {
+    position: Vec3,
+    velocity: Vec3,
+    ttl: f32,
+    gravity_factor: f32,
+    kind: EntityVariants,
+}
+
 pub struct Room {
     player: Player,
     blocks: Vec<Vec<Vec<Block>>>,
@@ -424,6 +502,8 @@ pub struct Room {
     any_collapse: bool,
     teleport_zones: Vec<(AABB, usize)>,
     pub teleport_to: Option<usize>,
+    particles: Vec<Particle>,
+    rng: RandGenerator,
 }
 
 impl Room {
@@ -459,6 +539,8 @@ impl Room {
             any_collapse: false,
             teleport_zones: vec![],
             teleport_to: None,
+            particles: vec![],
+            rng: RandGenerator::new(),
         }
     }
 
@@ -521,6 +603,14 @@ impl Room {
             Vec2::new(1.0, 1.0),
             variant,
         );
+        for particle in 0..self.particles.len() {
+            let particle = &self.particles[particle];
+            let pos = particle.position;
+            let size =
+                particle.kind.rect_and_rotation().0.size() * Vec2::new(1.0 / 16.0, 1.0 / 16.0);
+            let kind = particle.kind.clone();
+            self.insert_entity(pos, size, kind)
+        }
         for layer in &mut self.entities_per_layer {
             layer.sort_unstable_by(|a, b| a.position.y.partial_cmp(&b.position.y).unwrap());
         }
@@ -612,10 +702,13 @@ impl Room {
         }
         self.player.velocity.y += 9.0 * elapsed;
         self.player.position.y += self.player.velocity.y * elapsed;
-        if self.intersects(&self.player_bb()) {
+        let touched_ground = if self.intersects(&self.player_bb()) {
             self.player.position.y -= self.player.velocity.y * elapsed;
             self.player.velocity.y = 0.0;
-        }
+            true
+        } else {
+            false
+        };
         self.player.distance +=
             Vec2::new(self.player.velocity.x, self.player.velocity.z).length() * elapsed;
 
@@ -638,6 +731,59 @@ impl Room {
                 *delay -= elapsed;
                 if *delay <= 0.0 {
                     if let Block::Bridge { quality, .. } = &mut self.blocks[*z][*y][*x] {
+                        let likelyhood = match *quality {
+                            0 => 1.0,
+                            1 => 0.7,
+                            2 => 0.5,
+                            3 => 0.4,
+                            _ => 1.0,
+                        };
+                        for i in 0..4 {
+                            if self.rng.gen_range(0.0, 1.0) <= likelyhood {
+                                self.particles.push(Particle {
+                                    position: Vec3::new(
+                                        *x as f32 + (i as f32 * 0.25),
+                                        *y as f32,
+                                        *z as f32,
+                                    ),
+                                    velocity: Vec3::new(
+                                        self.rng.gen_range(-0.2, 0.2),
+                                        self.rng.gen_range(0.0, 0.15),
+                                        self.rng.gen_range(-0.2, 0.2),
+                                    ),
+                                    ttl: self.rng.gen_range(0.5, 2.5),
+                                    gravity_factor: 1.0,
+                                    kind: EntityVariants::Plank {
+                                        variant: self.rng.gen_range(0, 4),
+                                        rotation: self.rng.gen_range(0.0, 6.2),
+                                    },
+                                })
+                            }
+                        }
+                        for i in 0..4 {
+                            for j in 0..2 {
+                                if self.rng.gen_range(0.0, 1.0) <= 0.5 {
+                                    self.particles.push(Particle {
+                                        position: Vec3::new(
+                                            *x as f32 + (i as f32 * 0.25),
+                                            *y as f32 + (j as f32 * 0.5) - 0.25,
+                                            *z as f32,
+                                        ),
+                                        velocity: Vec3::new(
+                                            self.rng.gen_range(-0.2, 0.2),
+                                            self.rng.gen_range(0.0, 0.15),
+                                            self.rng.gen_range(-0.2, 0.2),
+                                        ),
+                                        ttl: self.rng.gen_range(0.5, 2.5),
+                                        gravity_factor: 1.0,
+                                        kind: EntityVariants::SmallBridgeBits {
+                                            variant: self.rng.gen_range(0, 8),
+                                        },
+                                    })
+                                }
+                            }
+                        }
+
                         *quality = 4;
                     }
                 }
@@ -649,6 +795,65 @@ impl Room {
                 if zone.contains(self.player.position) {
                     self.teleport_to = Some(*to);
                 }
+            }
+        }
+
+        for particle in &mut self.particles {
+            particle.position += particle.velocity * elapsed;
+            particle.velocity.y += 10.0 * elapsed * particle.gravity_factor;
+            particle.ttl -= elapsed;
+        }
+        for i in (0..self.particles.len()).rev() {
+            if self.particles[i].ttl < 0.0 {
+                self.particles.swap_remove(i);
+            }
+        }
+
+        if self.rng.gen_range(0.0, 1.5) < elapsed {
+            self.particles.push(Particle {
+                position: self.player.staff_position(),
+                velocity: Vec3::new(
+                    self.rng.gen_range(-0.1, 0.1),
+                    -0.1,
+                    self.rng.gen_range(-0.1, 0.1),
+                ),
+                ttl: self.rng.gen_range(0.6, 2.5),
+                gravity_factor: -0.2,
+                kind: EntityVariants::BigSorcery {
+                    variant: self.rng.gen_range(0, 4),
+                },
+            })
+        }
+        if self.rng.gen_range(0.0, 0.4) < elapsed {
+            self.particles.push(Particle {
+                position: self.player.staff_position(),
+                velocity: Vec3::new(
+                    self.rng.gen_range(-0.1, 0.1),
+                    -0.1,
+                    self.rng.gen_range(-0.1, 0.1),
+                ),
+                ttl: self.rng.gen_range(0.1, 0.7),
+                gravity_factor: -0.2,
+                kind: EntityVariants::SmallSorcery {
+                    variant: self.rng.gen_range(0, 4),
+                },
+            })
+        }
+        if touched_ground {
+            if self.rng.gen_range(0.0, 1.0) < elapsed * self.player.velocity.length() {
+                self.particles.push(Particle {
+                    position: self.player.position,
+                    velocity: Vec3::new(
+                        self.rng.gen_range(-0.2, 0.2),
+                        -self.rng.gen_range(0.3, 0.6),
+                        self.rng.gen_range(-0.2, 0.2),
+                    ),
+                    ttl: self.rng.gen_range(0.1, 0.7),
+                    gravity_factor: 0.5,
+                    kind: EntityVariants::Dust {
+                        variant: self.rng.gen_range(0, 4),
+                    },
+                })
             }
         }
     }

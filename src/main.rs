@@ -60,7 +60,7 @@ async fn main() {
     loop {
         clear_background(BLACK);
         if let Some(to) = room.teleport_to {
-            black_fade += get_frame_time() * 5.0;
+            black_fade += get_frame_time() * 1.0;
             if black_fade >= 1.0 {
                 black_fade = 1.0;
                 room = RoomGenerator::generate(&model, StateIndex::from_raw(to));
