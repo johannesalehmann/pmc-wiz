@@ -74,9 +74,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cc"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877bf67ac8e52449eb2f9e98a344ea163beb70dd1f9eebe3cc5357dcfeaee4df"
+checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -307,7 +307,7 @@ dependencies = [
 [[package]]
 name = "maybe-spanned-error-helper"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "ariadne",
  "prism-model",
@@ -410,6 +410,7 @@ name = "pmc-wiz"
 version = "0.1.0"
 dependencies = [
  "macroquad",
+ "probabilistic-models",
  "tiny-pmc",
 ]
 
@@ -429,7 +430,7 @@ dependencies = [
 [[package]]
 name = "prism-model"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "chumsky",
 ]
@@ -437,7 +438,7 @@ dependencies = [
 [[package]]
 name = "prism-model-builder"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "indexmap",
  "prism-model",
@@ -449,7 +450,7 @@ dependencies = [
 [[package]]
 name = "prism-parser"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "chumsky",
  "maybe-spanned-error-helper",
@@ -460,7 +461,7 @@ dependencies = [
 [[package]]
 name = "probabilistic-model-algorithms"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "probabilistic-models",
  "typed-index-collections",
@@ -469,7 +470,7 @@ dependencies = [
 [[package]]
 name = "probabilistic-models"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -480,7 +481,7 @@ dependencies = [
 [[package]]
 name = "probabilistic-properties"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 
 [[package]]
 name = "proc-macro2"
@@ -639,7 +640,7 @@ dependencies = [
 [[package]]
 name = "tiny-pmc"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "prism-model",
  "prism-model-builder",
@@ -662,7 +663,7 @@ dependencies = [
 [[package]]
 name = "typed-index-collections"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -671,7 +672,7 @@ dependencies = [
 [[package]]
 name = "umb-parser"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#89ec7c23e8d38d4b4f0539193d65d9f632aeea02"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#60291429443386872858dd6d68d0f658dd376997"
 dependencies = [
  "flate2",
  "indexmap",

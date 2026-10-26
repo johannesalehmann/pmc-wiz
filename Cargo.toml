@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 macroquad = "0.4.16"
-tiny-pmc = {git = "https://github.com/johannesalehmann/tiny-pmc"}
+tiny-pmc = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+probabilistic-models = { git = "https://github.com/johannesalehmann/tiny-pmc" }

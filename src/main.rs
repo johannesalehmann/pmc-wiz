@@ -1,8 +1,10 @@
 mod room;
 
-use crate::room::Room;
+use crate::room::RoomGenerator;
 use macroquad::miniquad::window::screen_size;
 use macroquad::prelude::*;
+use probabilistic_models::traits::{ReadChoiceLabelsMaybe, ReadValuationsMaybe};
+use probabilistic_models::{Index, StateIndex};
 use std::collections::HashMap;
 use tiny_pmc::ProcessingOptions;
 
@@ -19,39 +21,68 @@ async fn main() {
     } else {
         HashMap::new()
     };
-    let (model, queries) = tiny_pmc::build_model(inputs, consts, &ProcessingOptions::default())
+    let (model, _queries) = tiny_pmc::build_model(inputs, consts, &ProcessingOptions::default())
         .expect("failed to build model");
-    let mut room = Room::new(30, 15, 30);
-    room.carve_platform(5, 3, 3, 6, 6);
-    room.carve_platform(3, 7, 3, 10, 6);
-    room.carve_platform(5, 11, 1, 16, 8);
-    room.carve_platform(4, 11, 8, 16, 9);
-    room.build_stair(5, 4, 4, 2, false);
-    room.build_stair(11, 4, 4, 2, true);
-    room.build_bridge(16, 5, 1, 5, 0.05);
-    room.build_bridge(16, 5, 4, 3, 0.2);
-    room.build_bridge(16, 5, 7, 9, 0.5);
-    room.build_pillar(21, 5, 1);
-    room.build_pillar(19, 5, 4);
-    room.build_pillar(25, 5, 7);
-    room.build_tube(18, 6, 1);
-    room.build_tube(17, 6, 4);
-    room.build_tube(20, 6, 7);
-    room.build_sign(14, 4, 1, false);
-    room.build_sign(14, 4, 4, false);
-    room.build_sign(14, 4, 7, false);
-    room.place_player(13, 4, 4);
+    let model = model
+        .base_into_mdp()
+        .expect("Only MDPs are supported")
+        .try_with_choice_labels()
+        .unwrap()
+        .try_with_valuations()
+        .unwrap();
+    let mut room = RoomGenerator::generate(&model, StateIndex::default());
+    // room.carve_platform(5, 3, 3, 6, 6);
+    // room.carve_platform(3, 7, 3, 10, 6);
+    // room.carve_platform(5, 11, 1, 16, 8);
+    // room.carve_platform(4, 11, 8, 16, 9);
+    // room.build_stair(5, 4, 4, 2, false);
+    // room.build_stair(11, 4, 4, 2, true);
+    // room.build_bridge(16, 5, 1, 5, 0.05);
+    // room.build_bridge(16, 5, 4, 3, 0.2);
+    // room.build_bridge(16, 5, 7, 9, 0.5);
+    // room.build_pillar(21, 5, 1);
+    // room.build_pillar(19, 5, 4);
+    // room.build_pillar(25, 5, 7);
+    // room.build_tube(18, 6, 1);
+    // room.build_tube(17, 6, 4);
+    // room.build_tube(20, 6, 7);
+    // room.build_sign(14, 4, 1, false);
+    // room.build_sign(14, 4, 4, false);
+    // room.build_sign(14, 4, 7, false);
+    // room.place_player(13, 4, 4);
     let texture = load_texture("data/spritesheet.png").await.unwrap();
     texture.set_filter(FilterMode::Nearest);
     let mut camera = room::Camera {
         scale: 1.0,
         offset: Vec2::default(),
     };
+    let mut black_fade = 0.0;
     loop {
         clear_background(BLACK);
+        if let Some(to) = room.teleport_to {
+            black_fade += get_frame_time() * 5.0;
+            if black_fade >= 1.0 {
+                black_fade = 1.0;
+                room = RoomGenerator::generate(&model, StateIndex::from_raw(to));
+            }
+        } else {
+            black_fade -= get_frame_time() * 5.0;
+            if black_fade < 0.0 {
+                black_fade = 0.0;
+            }
+        }
         room.update();
         camera.update(screen_size(), room.player_pos());
         room.draw(&texture, &camera);
+        if black_fade > 0.0 {
+            draw_rectangle(
+                0.0,
+                0.0,
+                screen_width(),
+                screen_height(),
+                Color::new(0.0, 0.0, 0.0, black_fade),
+            );
+        }
 
         // draw_line(40.0, 40.0, 100.0, 200.0, 15.0, BLUE);
         // draw_rectangle(screen_width() / 2.0 - 60.0, 100.0, 120.0, 60.0, GREEN);
